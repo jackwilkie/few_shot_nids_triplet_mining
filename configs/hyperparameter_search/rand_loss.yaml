@@ -1,0 +1,6 @@
+---
+
+name: batch_all_triplet_loss
+metric: euclidean
+squared: True
+m: --:uniform(0.1,1.0,1)

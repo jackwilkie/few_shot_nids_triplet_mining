@@ -1,0 +1,29 @@
+---
+
+mixed_precision: False
+
+# -- weights
+weight_init: 0.02
+
+# -- optimiser
+optimiser: 
+    name: AdamW
+    betas:
+        - 0.9
+        - 0.999
+    weight_decay: 0.000001
+
+batch_size: 512
+grad_accumulation: 1
+
+# -- learning rate
+schedules:
+    lr:
+        name: cosine
+        start_val: 0.000001
+        end_val: 1e-6
+        T_max: 200
+    
+    
+# -- epochs
+training_epochs: 200

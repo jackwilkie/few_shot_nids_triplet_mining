@@ -1,0 +1,10 @@
+---
+
+name: contrastive_mlp
+d_in: ${dataset.n_features}
+d_out: --:randpower(3,8, power = 2)
+n_classes: ${dataset.n_classes}
+neurons: --:randpower(3,10, power = 2, n = --:randint(1,4))
+activation: relu
+dropout: --:randchoice(0.1, 0.2, 0.3)
+final_layer_activation: null

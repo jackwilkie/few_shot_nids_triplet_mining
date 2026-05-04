@@ -1,0 +1,13 @@
+---
+
+name: contrastive_mlp
+d_in: ${dataset.n_features}
+d_out: 64
+n_classes: ${dataset.n_classes}
+neurons: 
+  - 512
+  - 512
+
+activation: relu
+dropout: 0.1
+final_layer_activation: null

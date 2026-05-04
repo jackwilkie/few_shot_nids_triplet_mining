@@ -1,0 +1,6 @@
+---
+
+name: batch_all_triplet_loss
+metric: euclidean
+squared: True
+m: 0.9
