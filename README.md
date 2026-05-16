@@ -7,7 +7,7 @@ Official Github repo for the paper "Few-Shot Network Intrusion Detection using O
 
 ## Online Triplet Mining
 
-The triplet network uses a multilayer perceptron architecture ($\phi: \mathbb{R}^f \!\to \mathbb{R}^{f_o}$) which takes a set of tabular features ($\mathbb{R}^{f}$) and maps them to an embedded representation ($\mathbb{R}^{f_o}$) in which samples of the same class are close together, while samples of two different distributions are far apart. A triplet network can be instantiated using the [ContrastiveMLP](triplet_network/model.py#L127) class as shown below:
+The triplet network uses a multilayer perceptron architecture ($\phi: \mathbb{R}^f \!\to \mathbb{R}^{f_o}$) which takes a set of tabular features ($\mathbb{R}^{f}$) and maps them to an embedded representation ($\mathbb{R}^{f_o}$) in which samples of the same class are close together, while samples of two different distributions are far apart. A triplet network can be instantiated using the [`ContrastiveMLP`](triplet_network/model.py#L127) class as shown below:
 
 ```python
 from triplet_network.model import ContrastiveMLP
@@ -33,7 +33,7 @@ extracted_features = model.forward_features(features)  # [1024, 32]
 projected_features = model.forward_probe(extracted_features)  # [1024, 16]
 ```
 
-The online triplet mining loss function is used to train the triplet network. It is an adaptation of the standard triplet loss function where the loss is calculated over all valid triplets in a batch of embeddings. Various mining strategies are available in [triplet_network/loss.py](triplet_network/loss.py), including [BatchAllTripletLoss](triplet_network/loss.py#L217), [BatchSemiHardTripletLoss](triplet_network/loss.py#L338), and [BatchHardTripletLoss](triplet_network/loss.py#L383). Usage is shown below:
+The online triplet mining loss function is used to train the triplet network. It is an adaptation of the standard triplet loss function where the loss is calculated over all valid triplets in a batch of embeddings. Various mining strategies are available in [`triplet_network/loss.py`](triplet_network/loss.py), including [`BatchAllTripletLoss`](triplet_network/loss.py#L217), [`BatchSemiHardTripletLoss`](triplet_network/loss.py#L338), and [`BatchHardTripletLoss`](triplet_network/loss.py#L383). Usage is shown below:
 
 ```python
 from triplet_network.loss import BatchAllTripletLoss
@@ -60,7 +60,7 @@ frac_positive = criterion.get_fraction_pos()
 
 ## Inference
 
-Inference is performed by first embedding the training and test data using [extract_features](utils/process_batch.py#L35), then applying a [knn_classifier](triplet_network/knn_classifier.py#L162) and evaluating with [model_eval](utils/model_eval.py#L83) as shown below:
+Inference is performed by first embedding the training and test data using [`extract_features`](utils/process_batch.py#L35), then applying a [`knn_classifier`](triplet_network/knn_classifier.py#L162) and evaluating with [`model_eval`](utils/model_eval.py#L83) as shown below:
 
 ```python
 from utils.process_batch import extract_features
@@ -258,7 +258,7 @@ After downloading the datasets, place them in the `datasets/` directory:
 
 ### (3) Train Model
 
-A single training run can be performed using the [train_model.py](./train_model.py) script:
+A single training run can be performed using the [`train_model.py`](./train_model.py) script:
 
 ```
 python3 train_model.py
@@ -268,7 +268,7 @@ The script will train the model and save the weights to `./results/triplet_netwo
 
 ### (4) Evaluate Model
 
-After training a single evaluation run of the triplet network can be performed using the [evaluate_model.py](./evaluate_model.py) script:
+After training a single evaluation run of the triplet network can be performed using the [`evaluate_model.py`](./evaluate_model.py) script:
 
 ```
 python3 evaluate_model.py
@@ -278,7 +278,7 @@ The performance metrics of each model will be printed to the terminal after eval
 
 ### (5) Optimise Hyperparameters
 
-Hyperparameter optimising of the triplet network across all dataset sizes can be performed using the [fit_model.py](./fit_model.py) script:
+Hyperparameter optimising of the triplet network across all dataset sizes can be performed using the [`fit_model.py`](./fit_model.py) script:
 
 ```
 python3 fit_model.py
@@ -288,7 +288,7 @@ The performance metrics of each model will be printed to the terminal after eval
 
 ### (6) Evaluate Best Configuration
 
-Hyperparameter optimising of the triplet network across all dataset sizes can be performed using the [eval_best.py](./eval_best.py) script:
+Hyperparameter optimising of the triplet network across all dataset sizes can be performed using the [`eval_best.py`](./eval_best.py) script:
 
 ```
 python3 eval_best.py
