@@ -8,21 +8,23 @@ import torch as T
 from torch import Tensor
 import torch.nn as nn
 from typing import Callable, List, Optional
-    
+
+
 class DenseBlock(nn.Module):
-    '''
-     Dense blocks for feedforward network
-    '''
+    """
+    Dense blocks for feedforward network
+    """
+
     def __init__(
         self,
         in_dim: int,
         out_dim: Optional[int] = None,
-        dropout: float = 0.,
+        dropout: float = 0.0,
         dropout_layer: Callable[[float], nn.Module] = nn.Dropout,
         activation: Callable[[], nn.Module] = nn.ReLU,
         bias: bool = True,
     ) -> None:
-        '''
+        """
         Parameters
         ----------
         in_dim : int
@@ -37,13 +39,17 @@ class DenseBlock(nn.Module):
             Constructor function for activation layer. The default is nn.ReLU.
         bias : bool, optional
             Use bias term in linear layer. The default is True.
-        '''
-        
+        """
+
         super().__init__()
         self.in_dim = in_dim
-        self.out_dim = out_dim or in_dim  # use input dimenstions if output size not provided
-        self.block = nn.Sequential(nn.Linear(in_dim, out_dim, bias = bias), activation(), dropout_layer(dropout))
-        
+        self.out_dim = (
+            out_dim or in_dim
+        )  # use input dimenstions if output size not provided
+        self.block = nn.Sequential(
+            nn.Linear(in_dim, out_dim, bias=bias), activation(), dropout_layer(dropout)
+        )
+
     def forward(self, x: T.Tensor) -> T.Tensor:
         """
         Forward pass through the dense block.
@@ -59,18 +65,19 @@ class DenseBlock(nn.Module):
             Output after linear, activation, and dropout.
         """
         return self.block(x)
-    
+
+
 def make_mlp(
-        d_in: int,
-        neurons: List[int],
-        activation: Callable[[],nn.Module] = nn.ReLU,
-        dropout: float = 0.,
-        dropout_layer: Callable[[float], nn.Module] = nn.Dropout,
-        d_out: Optional[int] = None,
-        final_layer_activation: Optional[Callable[[], nn.Module]] = None,
-        bias: bool = True,
-    ) -> nn.Sequential:
-    '''
+    d_in: int,
+    neurons: List[int],
+    activation: Callable[[], nn.Module] = nn.ReLU,
+    dropout: float = 0.0,
+    dropout_layer: Callable[[float], nn.Module] = nn.Dropout,
+    d_out: Optional[int] = None,
+    final_layer_activation: Optional[Callable[[], nn.Module]] = None,
+    bias: bool = True,
+) -> nn.Sequential:
+    """
     Constructor function to make mlp
 
     Parameters
@@ -102,7 +109,7 @@ def make_mlp(
     import torch
     model = make_mlp(10, [64, 32], d_out=2)
     output = model(torch.randn(5, 10))
-    '''
+    """
 
     if not isinstance(neurons, list):
         neurons = [neurons]
@@ -111,26 +118,47 @@ def make_mlp(
     if d_out is not None:
         neurons = neurons + [d_out]
     layers = []  # init layers
-    
+
     # iterate over layers
     for i in range(len(neurons) - 1):
         # add layer with actiation function and dropout
-        if i != len(neurons) - 2:    
+        if i != len(neurons) - 2:
             # add dense block
-            layers += [DenseBlock(neurons[i], neurons[i + 1], activation = activation, dropout = dropout, dropout_layer = dropout_layer, bias = bias)]
-        
-        else:  # final layer has no activation or dropout        
-            layers += [DenseBlock(neurons[i], neurons[i + 1], activation = nn.Identity if final_layer_activation is None else final_layer_activation, dropout = 0., bias = bias)]
-    
+            layers += [
+                DenseBlock(
+                    neurons[i],
+                    neurons[i + 1],
+                    activation=activation,
+                    dropout=dropout,
+                    dropout_layer=dropout_layer,
+                    bias=bias,
+                )
+            ]
+
+        else:  # final layer has no activation or dropout
+            layers += [
+                DenseBlock(
+                    neurons[i],
+                    neurons[i + 1],
+                    activation=nn.Identity
+                    if final_layer_activation is None
+                    else final_layer_activation,
+                    dropout=0.0,
+                    bias=bias,
+                )
+            ]
+
     return nn.Sequential(*layers)  # create sequential network from layers
-        
+
+
 class ContrastiveMLP(nn.Module):
     """
     Contrastive MLP model for feature extraction, projection, and classification.
-    
+
     This model supports contrastive learning by providing separate forward passes
     for features, projections, and classification heads.
     """
+
     def __init__(
         self,
         d_in: int,
@@ -138,7 +166,7 @@ class ContrastiveMLP(nn.Module):
         activation: Callable[[], nn.Module] = nn.ReLU,
         dropout: float = 0.0,
         dropout_layer: Callable[[int], nn.Module] = nn.Dropout,
-        n_classes: Optional[int] = None, 
+        n_classes: Optional[int] = None,
         d_out: Optional[int] = None,
         final_layer_activation: Optional[Callable[[], nn.Module]] = None,
         bias: bool = True,
@@ -168,21 +196,23 @@ class ContrastiveMLP(nn.Module):
             Whether to use bias in linear layers. Default is True.
         """
         super().__init__()
-        neurons = neurons if isinstance(neurons,list) else [neurons]
-        
+        neurons = neurons if isinstance(neurons, list) else [neurons]
+
         self.mlp = make_mlp(
-            d_in = d_in,
-            neurons = neurons,
-            activation = activation,
-            dropout = dropout,
+            d_in=d_in,
+            neurons=neurons,
+            activation=activation,
+            dropout=dropout,
             dropout_layer=dropout_layer,
             final_layer_activation=final_layer_activation,
-            bias = bias,
+            bias=bias,
         )
-        
+
         self.proj = nn.Identity() if d_out is None else nn.Linear(neurons[-1], d_out)
-        self.probe = nn.Identity() if n_classes is None else nn.Linear(neurons[-1], n_classes)
-        
+        self.probe = (
+            nn.Identity() if n_classes is None else nn.Linear(neurons[-1], n_classes)
+        )
+
     def forward_features(self, x: Tensor) -> Tensor:
         """
         Forward pass through the MLP to extract features.
@@ -214,7 +244,7 @@ class ContrastiveMLP(nn.Module):
             Classification logits.
         """
         return self.probe(x)
-    
+
     def forward_finetune(self, x: Tensor) -> Tensor:
         """
         Forward pass for fine-tuning: features through classification.
@@ -264,19 +294,21 @@ class ContrastiveMLP(nn.Module):
         Tensor
             Projected features.
         """
-        x =  self.forward_features(x)
+        x = self.forward_features(x)
         return self.proj(x)
-    
+
     def reset_probe(self):
         """Reinitialize all Linear layers inside the probe"""
         for m in self.probe.modules():
             if isinstance(m, nn.Linear):
                 m.reset_parameters()
-    
+
+
 class ContrastiveFNN(ContrastiveMLP):
     """
     Contrastive FNN model that uses fine-tuning forward pass by default.
     """
+
     def forward(self, x: Tensor):
         """
         Forward pass using fine-tuning mode.

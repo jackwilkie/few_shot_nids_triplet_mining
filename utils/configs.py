@@ -127,81 +127,71 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
         return {}
 
     if not isinstance(config, dict):
-        raise ValueError(f"Expected YAML config to be a mapping, got {type(config).__name__}.")
+        raise ValueError(
+            f"Expected YAML config to be a mapping, got {type(config).__name__}."
+        )
 
     return config
 
 
-def parse_list(
-    start: int,
-    stop: int,
-    step: int = 1,
-    **_
-) -> list:
+def parse_list(start: int, stop: int, step: int = 1, **_) -> list:
     return [x for x in range(start, stop, step)]
+
 
 def identity(*args, **kwargs):
     return args, kwargs
 
+
 def get_command(name):
     commands = dict(
-        identity = identity,
-        log10_uniform = random_.log10_uniform,
-        randchoice = random_.randchoice,
-        uniform = random_.uniform,
-        randint = random_.randint,
-        randpower = random_.randpower,
-        make_list = parse_list,
-        )
+        identity=identity,
+        log10_uniform=random_.log10_uniform,
+        randchoice=random_.randchoice,
+        uniform=random_.uniform,
+        randint=random_.randint,
+        randpower=random_.randpower,
+        make_list=parse_list,
+    )
     return commands[name]
 
-def parse_config(
-        cnf:dict,
-        recursive: bool = True,
-        seed:int = None
-):
-    print(f'config_seed: {seed}')
+
+def parse_config(cnf: dict, recursive: bool = True, seed: int = None):
+    print(f"config_seed: {seed}")
     cnf = copy.deepcopy(cnf)
     cnf = resolve_config(cnf)
-    generator=Random(seed)
-    _parse_config(
-        cnf,
-        recursive = recursive,
-        generator = generator
-    )
+    generator = Random(seed)
+    _parse_config(cnf, recursive=recursive, generator=generator)
 
     return cnf
 
-def _parse_config(
-        cnf: dict,
-        recursive: bool = True,
-        generator: Random = None
-        ) -> dict:
-    
+
+def _parse_config(cnf: dict, recursive: bool = True, generator: Random = None) -> dict:
+
     generator = generator or Random()
-    
+
     for key, value in cnf.items():
         if recursive and isinstance(value, dict):
-            _parse_config(value, recursive = recursive, generator=generator)
-        
+            _parse_config(value, recursive=recursive, generator=generator)
+
         elif isinstance(value, str):
-            cnf[key] = parse_item(value, generator = generator)
-            
-    return cnf    
+            cnf[key] = parse_item(value, generator=generator)
+
+    return cnf
+
 
 def split_args(arg_string: str):
     args = []
-    current_arg = ''
+    current_arg = ""
     parenthesis_level = 0
 
     for char in arg_string:
-        if char == ',' and parenthesis_level == 0:
+        if char == "," and parenthesis_level == 0:
             args.append(current_arg.strip())
-            current_arg = ''
+            current_arg = ""
         else:
-            if char == '(':
+            if char == "(":
                 parenthesis_level += 1
-            elif char == ')':
+            elif char == ")":
                 parenthesis_level -= 1
             current_arg += char
 
@@ -211,38 +201,39 @@ def split_args(arg_string: str):
     return args
 
 
-def parse_item(
-        string: str,
-        generator: Optional[Random] = None
-        ):
-    
-    if isinstance(string, str) and len(string) > 3 and string[:3] == '--:':
+def parse_item(string: str, generator: Optional[Random] = None):
+
+    if isinstance(string, str) and len(string) > 3 and string[:3] == "--:":
         string = string[3:]
     else:
         return string
-    
-    if not '(' in string and not ')' in string:
-        raise ValueError('Invalid comand syntax: missing parenthesis')    
-    
-    command = get_command(string[:string.find('(')])
-    arg_list = string[string.find('(') + 1: string.rfind(')')]
+
+    if "(" not in string and ")" not in string:
+        raise ValueError("Invalid comand syntax: missing parenthesis")
+
+    command = get_command(string[: string.find("(")])
+    arg_list = string[string.find("(") + 1 : string.rfind(")")]
     arg_list = split_args(arg_list)
     args = []
-    kwargs = {'generator': generator}
+    kwargs = {"generator": generator}
     for arg in arg_list:
-        arg = arg.replace(' ', '')
-        if not '=' in arg:  # no positional args after kwargs
-            arg = parse_item(arg, generator = generator)
+        arg = arg.replace(" ", "")
+        if "=" not in arg:  # no positional args after kwargs
+            arg = parse_item(arg, generator=generator)
             arg = ast.literal_eval(arg) if isinstance(arg, str) else arg
             if len(kwargs) == 1:
                 args.append(arg)
             else:
-                raise ValueError('Error Positional arg found after keyword arg')
-        else: # key word arg
-            key = arg[:arg.find('=')]
-            arg_string = arg[arg.find('=') + 1:]
+                raise ValueError("Error Positional arg found after keyword arg")
+        else:  # key word arg
+            key = arg[: arg.find("=")]
+            arg_string = arg[arg.find("=") + 1 :]
             arg_string = parse_item(arg_string, generator=generator)
-            arg = ast.literal_eval(arg_string) if isinstance(arg_string, str) else arg_string            
+            arg = (
+                ast.literal_eval(arg_string)
+                if isinstance(arg_string, str)
+                else arg_string
+            )
             kwargs[key] = arg
 
     return command(*args, **kwargs)
