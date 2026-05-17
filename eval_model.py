@@ -141,7 +141,7 @@ def load_data(cnf):
     )
 
     # renormalise data
-    x_test = (x_test - x_train.mean(axis=0)) / x_test.std(axis=0, ddof=1)
+    x_test = (x_test - x_train.mean(axis=0)) / x_train.std(axis=0, ddof=1)
     x_train = (x_train - x_train.mean(axis=0)) / x_train.std(axis=0, ddof=1)
 
     # convert to tensore and return
