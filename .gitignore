@@ -214,3 +214,6 @@ datasets/lycos2017.csv
 results/**
 !results/**/
 !results/**/.gitkeep
+
+# required due to local package name conflict-- not required for fresh environments
+utils/__init__.py
