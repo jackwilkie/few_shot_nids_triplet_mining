@@ -25,7 +25,11 @@ def _resolve_reference(key_path: str, config: Dict[str, Any]) -> Any:
     return pointer
 
 
-def _resolve_string(value: str, config: Dict[str, Any]) -> str:
+def _resolve_string(value: str, config: Dict[str, Any]) -> Any:
+    full_match = PLACEHOLDER_PATTERN.fullmatch(value)
+    if full_match is not None:
+        return _resolve_reference(full_match.group(1), config)
+
     def _replace(match: re.Match) -> str:
         replacement = _resolve_reference(match.group(1), config)
         return str(replacement)

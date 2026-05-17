@@ -3,36 +3,42 @@
 
 import torch as T
 import argparse
-from utils.configs import compose_config, load_yaml_config, resolve_config
-
-
-from model.model import ContrastiveMLP
-from losses.clad_loss import CLADLoss
 import time
+import os
+import sys
 
-
+from utils.configs import compose_all_configs
+from utils.schedules import CosineSchedule, LRSchedule
+from utils.meter import AverageMeter
+from utils.checkpoint import make_checkpoint
 from data.load_data import get_data
 from data.loaders import tabular_dl
-from util.schedules import WarmupCosineSchedule, LRSchedule
-import sys
-from util.meter import AverageMeter
-from util.checkpoint import make_checkpoint
+from data.limited_data import get_limited_train_set
+from triplet_network.model import ContrastiveMLP
+from triplet_network.loss import BatchAllTripletLoss
 
 def parse_option():
     parser = argparse.ArgumentParser('argument for training')
 
+    # training sample size
+    parser.add_argument('--n_malicious', type=int, default=160, help='number of malicious samples per class')
+    parser.add_argument('--n_benign', type=int, default=10000, help='number of benign samples')
+    parser.add_argument('--limited_sample_seed', type=int, default=19048, help='sample seed for limited data sampling')
+    parser.add_argument('--iteration', type=int, default=0, help='training iteration')
+    
     # data config
     parser.add_argument('--dataset_path', type=str, default='configs/datasets/lycos2017.yaml', help='path to dataset config')
     
     # model config
-    parser.add_argument('--model_config_path', type=str, default='flow_id,src_addr,src_port,dst_addr,dst_port,ip_prot,timestamp', help='columns to drop from dataset')
+    parser.add_argument('--model_config_path', type=str, default='configs/model.yaml', help='path to model config')
     
     # loss config
-    parser.add_argument('--loss_config_path', type=str, default='flow_id,src_addr,src_port,dst_addr,dst_port,ip_prot,timestamp', help='columns to drop from dataset')
+    parser.add_argument('--loss_config_path', type=str, default='configs/loss.yaml', help='path to loss config')
     
     # hyperparameter config
-    parser.add_argument('--hyperparameter_config_path', type=str, default='flow_id,src_addr,src_port,dst_addr,dst_port,ip_prot,timestamp', help='columns to drop from dataset')
+    parser.add_argument('--hyperparameter_config_path', type=str, default='configs/hyperparameters.yaml', help='path to hyperparameter config')
     
+    parser.add_argument('--checkpoint_path', type=str, default='results/triplet_network/triplet_network.pt.tar', help='path to checkpoint file')
     parser.add_argument('--device', type=str, default='cuda', help='device')
     parser.add_argument('--print_freq', type=int, default=100, help='how many batches to print after')
     
@@ -53,22 +59,39 @@ def parse_option():
     
     return opt
 
-def set_loader(opt):
+def set_loader(cnf):
+    
+    # load dataset
     x_train, y_train, _, _, _, _, _, _ = get_data(
-        data_path = opt.data_path, 
+        data_path = cnf['dataset']['data_path'], 
         target = 'label', 
-        drop = opt.drop_cols, 
+        drop = cnf['dataset']['drop_cols'], 
         class_zero = 'benign', 
-        sample_thres = opt.sample_thres,
-        split_seed = opt.split_seed,
+        sample_thres = cnf['dataset']['sample_thres'],
+        split_seed = cnf['dataset']['split_seed'],
         test_ratio = 0.5,
         val_ratio = 0.0,
     )
     
+    # sample limited training set from training data
+    x_train, y_train, _, _ = get_limited_train_set(
+        x_data = x_train,
+        y_data = y_train, 
+        benign_samples = cnf['dataset']['n_benign'], 
+        attack_samples = cnf['dataset']['n_malicious'], 
+        seed = cnf['dataset']['limited_sample_seed'], 
+        set_num= cnf['dataset']['iteration'], 
+        replacement = False,
+    )
+    
+    # renormalise data
+    x_train = (x_train - x_train.mean(axis = 0)) / x_train.std(axis = 0, ddof = 1)
+    
+    # build data loader
     train_dl = tabular_dl(
         x = x_train,
         y = y_train,
-        batch_size = opt.batch_size, 
+        batch_size = cnf['hyperparameters']['batch_size'], 
         balanced = True,
         collate_fn = None,
         drop_last = True,
@@ -77,39 +100,37 @@ def set_loader(opt):
     
     return train_dl
 
-def set_model(opt):
+def set_model(cnf):
     # get model
     model = ContrastiveMLP(
-        d_in = 72,
-        n_classes = opt.n_classes,
-        d_out = opt.d_out,
-        neurons = opt.neurons,
-        dropout = opt.dropout,
-        residual = opt.residual,
+        d_in = cnf['model']['d_in'],
+        n_classes = cnf['model']['n_classes'],
+        d_out = cnf['model']['d_out'],
+        neurons = cnf['model']['neurons'],
+        dropout = cnf['model']['dropout'],
     )
-    model = model.to(opt.device)
+    model = model.to(cnf['device'])
     
     # get loss
-    criterion = CLADLoss(
-        m = opt.margin,
-        squared = opt.squared,
-    )
-    return model, criterion
-
-def set_optimiser(opt, model, train_dl):
-    optimiser = T.optim.AdamW(
-        model.parameters(),
-        lr=1e-6, # initial learning rate
-        betas = (0.9, 0.999),
-        weight_decay = opt.weight_decay,
+    criterion = BatchAllTripletLoss(
+        m = cnf['loss']['m'],
+        squared = cnf['loss']['squared'],
     )
     
-    base_schedule = WarmupCosineSchedule(
-        start_val = 1e-6,
-        end_val = 1e-6,
-        ref_val = opt.lr,
-        T_max = (opt.epochs * len(train_dl)),
-        warmup_steps =  int((opt.epochs//10) * len(train_dl)),
+    return model, criterion
+
+def set_optimiser(cnf, model, train_dl):
+    optimiser = T.optim.AdamW(
+        model.parameters(),
+        lr=1e-6,
+        betas = (0.9, 0.999),
+        weight_decay = cnf['hyperparameters']['optimiser']['weight_decay'],
+    )
+    
+    base_schedule = CosineSchedule(
+        start_val = cnf['hyperparameters']['schedules']['lr']['start_val'],
+        end_val = cnf['hyperparameters']['schedules']['lr']['end_val'],
+        T_max = (cnf['hyperparameters']['training_epochs'] * len(train_dl)),
     )
     
     lr_schedule = LRSchedule(
@@ -124,6 +145,7 @@ def train(
     model, 
     criterion, 
     optimizer, 
+    schedule,
     epoch, 
     opt,
 ):
@@ -144,10 +166,7 @@ def train(
         bsz = y.size(0)
 
         z = model(x)        
-        loss = criterion(
-            x = z,
-            y = y,
-        )
+        loss = criterion(z,y)
 
         # update metric
         losses.update(loss.item(), bsz)
@@ -157,6 +176,7 @@ def train(
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        schedule.step()
         
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -179,43 +199,47 @@ def train(
 def main():
     opt = parse_option()
 
-    # get config files
-    data_config = compose_config(opt.dataset_path)
-    hyperparameter_config = compose_config(opt.dataset_path)
-    model_config = compose_config(opt.dataset_path)
-    loss_config = compose_config(opt.dataset_path)
+    # Load and resolve all config files together so cross-config references work.
+    cnf = compose_all_configs(
+        {
+            "dataset": opt.dataset_path,
+            "hyperparameters": opt.hyperparameter_config_path,
+            "model": opt.model_config_path,
+            "loss": opt.loss_config_path,
+        }
+    )
 
-    dataset_cfg = compose_config(opt.dataset_path)
-    model_cfg = load_yaml_config(opt.model_config_path)
-    
-    model_cfg["dataset"] = dataset_cfg
-    model_cfg = resolve_config(model_cfg)
-
+    # inject sample settings into config
+    cnf['dataset']['n_malicious'] = opt.n_malicious
+    cnf['dataset']['n_benign'] = opt.n_benign
+    cnf['dataset']['limited_sample_seed'] = opt.limited_sample_seed
+    cnf['dataset']['iteration'] = opt.iteration
+    cnf['device'] = opt.device
     
     # build data loader
-    train_loader = set_loader(opt)
+    train_loader = set_loader(cnf)
     
     # build model and criterion
-    model, criterion = set_model(opt)
+    model, criterion = set_model(cnf)
     
     # build optimizer
-    optimiser, schedule = set_optimiser(opt, model, train_loader)
+    optimiser, schedule = set_optimiser(cnf, model, train_loader)
 
     # training routine
-    for epoch in range(1, opt.epochs + 1):
+    for epoch in range(1, cnf['hyperparameters']['training_epochs'] + 1):
         # train for one epoch
         time1 = time.time()
-        loss = train(train_loader, model, criterion, optimiser, epoch, opt)
+        loss = train(train_loader, model, criterion, optimiser, schedule, epoch, opt)
         time2 = time.time()
         print('epoch {}, total time {:.2f}'.format(epoch, time2 - time1))
-        schedule.step()
-        
+
     # save the trained model
+    os.makedirs(os.path.dirname(opt.checkpoint_path), exist_ok=True)
     make_checkpoint(
         model = model, 
         optimiser = optimiser, 
         schedular = schedule, 
-        path = 'weights/clad.pt.tar', 
+        path = opt.checkpoint_path, 
     )
 
 if __name__ == "__main__":

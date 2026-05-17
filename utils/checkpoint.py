@@ -50,7 +50,7 @@ def load_checkpoint(
         distributed_to_local: bool = False
         ):
     path = ensure_extension(path, '.pt.tar')
-    checkpoint = T.load(path, map_location = 'cpu')
+    checkpoint = T.load(path, map_location = 'cpu', weights_only = False)
     
     # load model weights
     model_state_dict = checkpoint['model_state_dict'] if not distributed_to_local else convert_distributed_to_local(checkpoint['model_state_dict'])

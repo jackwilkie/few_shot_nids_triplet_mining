@@ -21,7 +21,7 @@ schedules:
     lr:
         name: cosine
         start_val: 0.000001
-        end_val: 1e-6
+        end_val: 0.000001
         T_max: 200
     
     

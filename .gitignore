@@ -209,3 +209,8 @@ __marimo__/
 # datasets
 datasets/cicids2017.csv
 datasets/lycos2017.csv
+
+# results
+results/**
+!results/**/
+!results/**/.gitkeep

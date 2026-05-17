@@ -6,7 +6,7 @@ tabular: True
 data_path: ~/data/lycos.csv
 
 # -- columns to drop to prevent dataleak due to labelling method
-drop:
+drop_cols:
     - flow_id
     - src_addr
     - src_port

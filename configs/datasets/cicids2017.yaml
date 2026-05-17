@@ -6,7 +6,7 @@ tabular: True
 data_path: ~/data/cicids2017.csv
 
 # -- columns to drop to prevent dataleak due to labelling method
-drop:
+drop_cols:
     - proto
     - prt_dst
     - prt_src
